@@ -118,13 +118,49 @@ This project explores the following analytical questions:
 
 ## SQL Analysis
 
-SQL queries used for the analysis are stored in:
+SQL queries used for the analysis are stored in [`sql/analysis_queries.sql`](sql/analysis_queries.sql).
 
-```
-sql/analysis_queries.sql
+**Example: Most common genres**
+
+Netflix's `genres` column stores values as a string-encoded array (e.g. `"['Drama', 'Comedy']"`), so this query cleans and unpacks it before counting.
+
+```sql
+SELECT 
+    TRIM(g.genre) AS genre,
+    COUNT(*) AS total_titles
+FROM titles t
+CROSS JOIN LATERAL unnest(
+    string_to_array(
+        replace(replace(replace(t.genres,'[',''),']',''),'''',''),
+        ','
+    )
+) AS g(genre)
+WHERE t.genres <> '[]'
+GROUP BY TRIM(g.genre)
+ORDER BY total_titles DESC
+LIMIT 10;
 ```
 
-These queries explore content distribution, genre frequency, and actor appearances within the Netflix catalog.
+**Example: Best directors by average IMDb score**
+
+Filters out directors with fewer than 3 titles, so the ranking isn't skewed by a single high-scoring outlier.
+
+```sql
+SELECT 
+    c.name AS director,
+    ROUND(AVG(t.imdb_score)::numeric, 2) AS avg_score,
+    COUNT(DISTINCT t.id) AS total_titles
+FROM credits c
+JOIN titles t ON c.id = t.id
+WHERE c.role = 'DIRECTOR'
+AND t.imdb_score IS NOT NULL
+GROUP BY c.name
+HAVING COUNT(DISTINCT t.id) >= 3
+ORDER BY avg_score DESC
+LIMIT 10;
+```
+
+The remaining 8 queries cover content distribution, top-rated titles, actor appearances, and yearly trends.
 
 ---
 
